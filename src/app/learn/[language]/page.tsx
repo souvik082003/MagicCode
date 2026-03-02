@@ -1,7 +1,6 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { getTopicsList } from "@/data/topics";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Terminal, Lock, CheckCircle2, BookOpen, ArrowLeft, Trophy, Star } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -14,14 +13,36 @@ export default function LearnPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const topicId = searchParams.get("topic");
-    const topics = getTopicsList();
+
+    const [topics, setTopics] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // Extract language from pathname like "/learn/c" or "/learn/cpp"
     const languageKey = pathname?.split('/').pop() || "c";
-    const language = languageKey === "cpp" ? "C++" : "C";
+    const language = languageKey === "cpp" ? "C++" : languageKey === "dsa" ? "DSA" : "C";
 
     const [completedTopics, setCompletedTopics] = useState<string[]>([]);
     const [xp, setXp] = useState(0);
+
+    // Fetch dynamic JSON
+    useEffect(() => {
+        fetch("/data/learning-paths.json")
+            .then((res) => res.json())
+            .then((data) => {
+                const list = Object.entries(data).map(([id, topic]: [string, any]) => ({
+                    id,
+                    ...topic,
+                }));
+                // In a true multi-path setup, you could filter by languageKey here if sections differ.
+                // For now, let's use the universal list.
+                setTopics(list);
+                setLoading(false);
+            })
+            .catch((err) => {
+                console.error("Error fetching paths:", err);
+                setLoading(false);
+            });
+    }, [languageKey]);
 
     // Load progress from localStorage
     useEffect(() => {
@@ -42,6 +63,22 @@ export default function LearnPage() {
         }
         router.push(`/learn/${languageKey}`); // Go back to map
     };
+
+    if (loading) {
+        return (
+            <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
+                <div className="text-xl font-medium animate-pulse">Loading Roadmaps...</div>
+            </div>
+        );
+    }
+
+    if (topics.length === 0) {
+        return (
+            <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
+                <div className="text-xl text-muted-foreground">No topics found. Please check data source.</div>
+            </div>
+        );
+    }
 
     // If a topic is selected, render the Topic Detail View
     if (topicId) {

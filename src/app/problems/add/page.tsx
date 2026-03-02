@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProblemDefinition, SupportedLanguage, TestCase } from "@/types/problem";
-import { saveCustomProblem } from "@/lib/problems";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -22,6 +21,7 @@ export default function AddProblemPage() {
     const [language, setLanguage] = useState<SupportedLanguage>("javascript");
     const [description, setDescription] = useState("");
     const [template, setTemplate] = useState("");
+    const [driverCode, setDriverCode] = useState("");
     const [testCases, setTestCases] = useState<TestCase[]>([{ input: "", expectedOutput: "" }]);
 
     const handleAddTestCase = () => {
@@ -40,7 +40,7 @@ export default function AddProblemPage() {
         setTestCases(newTestCases);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!title.trim() || !description.trim() || !template.trim()) {
@@ -54,25 +54,36 @@ export default function AddProblemPage() {
             return;
         }
 
-        const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + "-" + Date.now().toString().slice(-4);
+        const problemId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + "-" + Date.now().toString().slice(-4);
 
-        const newProblem: ProblemDefinition = {
-            id,
+        const newProblem = {
+            problemId,
             title,
             difficulty,
             category,
             language,
             description,
             template,
+            driverCode,
             testCases: validTestCases
         };
 
         try {
-            saveCustomProblem(newProblem);
+            const res = await fetch("/api/problems", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newProblem),
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Failed to save problem");
+            }
+
             toast.success("Problem saved successfully!");
             router.push("/problems");
-        } catch (error) {
-            toast.error("Failed to save problem. LocalStorage might be full.");
+        } catch (error: any) {
+            toast.error(error.message || "Failed to save problem.");
         }
     };
 
@@ -143,6 +154,7 @@ export default function AddProblemPage() {
                                         <SelectItem value="python">Python 3.10</SelectItem>
                                         <SelectItem value="cpp">C++</SelectItem>
                                         <SelectItem value="c">C</SelectItem>
+                                        <SelectItem value="java">Java 15</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -169,6 +181,20 @@ export default function AddProblemPage() {
                                 placeholder="Provide the starting boilerplate code for the user..."
                                 className="min-h-[200px] font-mono text-sm bg-zinc-950 text-zinc-300"
                                 required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="driverCode">Hidden Driver Code (Optional) </Label>
+                            <CardDescription className="mb-2">
+                                Use the <code className="bg-muted px-1 py-0.5 rounded text-primary">{"{{USER_CODE}}"}</code> macro to inject the user's submitted solution block into a hidden <code className="bg-muted px-1 py-0.5 rounded text-primary">main()</code> function for LeetCode-style execution.
+                            </CardDescription>
+                            <Textarea
+                                id="driverCode"
+                                value={driverCode}
+                                onChange={(e) => setDriverCode(e.target.value)}
+                                placeholder={`#include <iostream>\n#include <vector>\nusing namespace std;\n\n{{USER_CODE}}\n\nint main() {\n    // Hidden testing logic here \n}`}
+                                className="min-h-[200px] font-mono text-sm bg-zinc-950/50 border-dashed text-zinc-400"
                             />
                         </div>
                     </CardContent>

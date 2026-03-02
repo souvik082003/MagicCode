@@ -6,79 +6,76 @@ import { motion } from "framer-motion";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Code2, CheckCircle2, Search, Zap, BookOpen, Star, Plus, UploadCloud } from "lucide-react";
+import { Trophy, Code2, CheckCircle2, Search, Zap, BookOpen, Star, Building2, FilterX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProgress } from "@/lib/progress";
-import { getCustomProblems, saveCustomProblem } from "@/lib/problems";
 import { ProblemDefinition } from "@/types/problem";
 import { toast } from "sonner";
 
-// Extended problem list
-const defaultProblems: Partial<ProblemDefinition>[] = [
-    { id: "hello-world", title: "Hello World", difficulty: "Easy", language: "c", category: "Basics" },
-    { id: "variables", title: "Variables & Types", difficulty: "Easy", language: "cpp", category: "Basics" },
-    { id: "two-sum", title: "Two Sum Simulator", difficulty: "Medium", language: "cpp", category: "Arrays" },
-    { id: "reverse-string", title: "Reverse String", difficulty: "Easy", language: "c", category: "Strings" },
-    { id: "linked-list-cycle", title: "Linked List Cycle", difficulty: "Medium", language: "cpp", category: "Data Structures" },
-    { id: "pointers-intro", title: "Intro to Pointers", difficulty: "Hard", language: "c", category: "Pointers" },
-];
+import { fallbackProblems } from "@/data/fallbackProblems";
+
+// We extract the array of definitions from the dictionary
+const defaultProblems: Partial<ProblemDefinition>[] = Object.values(fallbackProblems).map(p => ({
+    id: p.id,
+    title: p.title,
+    difficulty: p.difficulty,
+    language: p.language,
+    category: p.category
+}));
 
 export default function ProblemsPage() {
     const { isProblemCompleted } = useProgress();
     const [searchQuery, setSearchQuery] = useState("");
     const [difficultyTab, setDifficultyTab] = useState("all");
     const [sourceTab, setSourceTab] = useState("all");
+    const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
     const [problems, setProblems] = useState<Partial<ProblemDefinition>[]>(defaultProblems);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const loadProblems = () => {
-        const customProblems = getCustomProblems();
-        // Tag them so we can filter by source
-        const taggedCustom = customProblems.map(p => ({ ...p, isCustom: true }));
-        setProblems([...defaultProblems.map(p => ({ ...p, isCustom: false })), ...taggedCustom]);
+    const loadProblems = async () => {
+        try {
+            const res = await fetch("/api/problems");
+            if (res.ok) {
+                const data = await res.json();
+
+                // Add default static problems if desired, or just use the DB ones
+                const dbProblems = data.problems.map((p: any) => ({ ...p, isCustom: p.category === "Custom", id: p.problemId }));
+
+                // We merge with defaultProblems so they never lose the base set.
+                const merged = [...defaultProblems.map(p => ({ ...p, isCustom: false })), ...dbProblems];
+
+                // Remove duplicates by id just in case
+                let uniqueContent = Array.from(new Map(merged.map(item => [item.id, item])).values());
+
+                // Sort by creation date ascending (oldest first) to assign sequential standard IDs
+                uniqueContent.sort((a, b) => {
+                    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                    return timeA - timeB;
+                });
+
+                // Strip hardcoded prefixes and assign stable sequence numbers
+                uniqueContent = uniqueContent.map((p, idx) => ({
+                    ...p,
+                    title: p.title?.replace(/^\d+\.\s*/, ''),
+                    problemNumber: idx + 1
+                }));
+
+                // Re-sort ascending natively
+                uniqueContent.sort((a, b) => (a.problemNumber || 0) - (b.problemNumber || 0));
+
+                setProblems(uniqueContent);
+            }
+        } catch (error) {
+            console.error("Failed to load problems:", error);
+            // Fallback to defaults
+            setProblems(defaultProblems.map(p => ({ ...p, isCustom: false })));
+        }
     };
 
     useEffect(() => {
         loadProblems();
     }, []);
-
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const content = event.target?.result as string;
-                const parsed = JSON.parse(content);
-
-                // Allow single object or array
-                const newProblems: ProblemDefinition[] = Array.isArray(parsed) ? parsed : [parsed];
-
-                let addedCount = 0;
-                for (const prob of newProblems) {
-                    if (prob.id && prob.title && prob.template) {
-                        saveCustomProblem(prob);
-                        addedCount++;
-                    }
-                }
-
-                if (addedCount > 0) {
-                    toast.success(`Successfully imported ${addedCount} custom problem(s)!`);
-                    loadProblems(); // Reload state
-                } else {
-                    toast.error("Invalid JSON format. Expected ProblemDefinition format.");
-                }
-            } catch (err) {
-                toast.error("Failed to parse the JSON file.");
-            }
-        };
-        reader.readAsText(file);
-
-        // Reset input so the same file can be selected again
-        if (fileInputRef.current) fileInputRef.current.value = "";
-    };
 
 
     const completedCount = problems.filter((p) => p.id && isProblemCompleted(p.id)).length;
@@ -96,8 +93,16 @@ export default function ProblemsPage() {
         if (sourceTab === "standard") matchesSource = prob.isCustom === false;
         if (sourceTab === "custom") matchesSource = prob.isCustom === true;
 
-        return matchesSearch && matchesDifficulty && matchesSource;
+        let matchesCompany = true;
+        if (selectedCompany) {
+            matchesCompany = !!prob.companies?.includes(selectedCompany);
+        }
+
+        return matchesSearch && matchesDifficulty && matchesSource && matchesCompany;
     });
+
+    // Extract all unique companies from the loaded problem set
+    const uniqueCompanies = Array.from(new Set(problems.flatMap(p => p.companies || []))).filter(Boolean).sort();
 
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 min-h-[calc(100vh-3.5rem)] bg-background">
@@ -111,25 +116,6 @@ export default function ProblemsPage() {
                     <p className="text-muted-foreground text-lg max-w-2xl">
                         Master multiple languages through interactive problem solving. From basic syntax to advanced algorithms.
                     </p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                        <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
-                            <Link href="/problems/add">
-                                <Plus className="w-4 h-4 mr-2" />
-                                Create Custom Problem
-                            </Link>
-                        </Button>
-                        <Button variant="outline" className="border-dashed font-semibold" onClick={() => fileInputRef.current?.click()}>
-                            <UploadCloud className="w-4 h-4 mr-2" />
-                            Upload Coding Set (JSON)
-                        </Button>
-                        <input
-                            type="file"
-                            accept=".json"
-                            className="hidden"
-                            ref={fileInputRef}
-                            onChange={handleFileUpload}
-                        />
-                    </div>
                 </div>
 
                 {/* Stats Card */}
@@ -180,6 +166,34 @@ export default function ProblemsPage() {
                 </div>
             </div>
 
+            {/* Company Folders Row */}
+            {uniqueCompanies.length > 0 && (
+                <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Building2 className="w-4 h-4" /> Company Problem Sets
+                    </h3>
+                    <div className="flex overflow-x-auto pb-4 gap-3 hide-scrollbar snap-x">
+                        <Button
+                            variant={selectedCompany === null ? "default" : "secondary"}
+                            className="rounded-full snap-start whitespace-nowrap"
+                            onClick={() => setSelectedCompany(null)}
+                        >
+                            <FilterX className="w-4 h-4 mr-2" /> All Companies
+                        </Button>
+                        {uniqueCompanies.map(company => (
+                            <Button
+                                key={company}
+                                variant={selectedCompany === company ? "default" : "outline"}
+                                className={`rounded-full snap-start whitespace-nowrap border-primary/20 hover:border-primary/50 ${selectedCompany === company ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' : 'bg-card'}`}
+                                onClick={() => setSelectedCompany(company)}
+                            >
+                                <Building2 className={`w-4 h-4 mr-2 ${selectedCompany === company ? '' : 'text-blue-500'}`} /> {company}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Problems Grid */}
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {filteredProblems.map((prob, idx) => (
@@ -207,27 +221,53 @@ export default function ProblemsPage() {
                                             <Badge variant="secondary" className="flex items-center gap-1">
                                                 <BookOpen className="w-3 h-3" /> {prob.category}
                                             </Badge>
-                                            {/* Custom Upload Badge */}
-                                            {prob.isCustom && (
+                                            {/* Custom vs Official Badge */}
+                                            {prob.isCustom ? (
                                                 <Badge variant="outline" className="border-blue-500/30 text-blue-500 bg-blue-500/5">
                                                     Custom
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="border-amber-500/30 text-amber-500 bg-amber-500/5">
+                                                    Official
+                                                </Badge>
+                                            )}
+                                            {/* Dynamic "New" Badge (Active for 5 days) */}
+                                            {prob.createdAt && (Date.now() - new Date(prob.createdAt).getTime()) < 5 * 24 * 60 * 60 * 1000 && (
+                                                <Badge variant="default" className="bg-red-500 text-white hover:bg-red-600 border-none shadow-md">
+                                                    New
                                                 </Badge>
                                             )}
                                         </div>
                                         {prob.id && isProblemCompleted(prob.id) ? (
-                                            <span className="flex items-center text-sm font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                                            <span className="flex items-center text-sm font-medium text-green-500 bg-green-500/10 px-2 py-1 rounded-full shrink-0">
                                                 <CheckCircle2 className="w-4 h-4 mr-1" /> Solved
                                             </span>
                                         ) : (
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                            <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                                                 <Zap className="w-4 h-4" />
                                             </div>
                                         )}
                                     </div>
-                                    <CardTitle className="text-xl group-hover:text-primary transition-colors">{prob.title}</CardTitle>
-                                    <CardDescription className="flex items-center gap-2">
-                                        <Code2 className="w-4 h-4" /> {prob.language}
-                                    </CardDescription>
+                                    <CardTitle className="text-xl group-hover:text-primary transition-colors line-clamp-1">
+                                        {prob.problemNumber ? `${prob.problemNumber}. ` : ""}{prob.title}
+                                    </CardTitle>
+                                    <div className="flex justify-between items-center mt-2">
+                                        <CardDescription className="flex items-center gap-2">
+                                            <Code2 className="w-4 h-4" /> {prob.language}
+                                        </CardDescription>
+
+                                        {/* Company preview chips on card */}
+                                        {prob.companies && prob.companies.length > 0 && (
+                                            <div className="flex gap-1 overflow-hidden">
+                                                {prob.companies.slice(0, 2).map((c, i) => (
+                                                    <span key={i} className="text-[10px] font-bold px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-md whitespace-nowrap">
+                                                        {c}
+                                                    </span>
+                                                ))}
+                                                {prob.companies.length > 2 && <span className="text-[10px] px-1.5 py-0.5 text-zinc-500 border border-zinc-800 rounded-md">+{prob.companies.length - 2}</span>}
+                                            </div>
+                                        )}
+                                    </div>
                                 </CardHeader>
                             </Card>
                         </Link>

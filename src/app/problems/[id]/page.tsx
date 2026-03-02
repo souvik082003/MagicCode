@@ -4,79 +4,68 @@ import { Workspace } from "@/components/editor/Workspace";
 import { notFound, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ProblemDefinition } from "@/types/problem";
-
-const problemData: Record<string, ProblemDefinition> = {
-    "hello-world": {
-        id: "hello-world",
-        title: "1. Hello World",
-        difficulty: "Easy",
-        category: "Basics",
-        language: "c",
-        description: (
-            <>
-                <p>Write a program that prints exactly <code className="bg-muted px-1 py-0.5 rounded text-primary">Hello World!</code> to the standard output.</p>
-                <p className="mt-4 text-sm text-muted-foreground border-l-2 border-primary pl-4">Hint: Use the <code>printf()</code> function.</p>
-            </>
-        ),
-        template: '#include <stdio.h>\n\nint main() {\n    // Write your code here\n    \n    return 0;\n}',
-        testCases: [
-            { input: "", expectedOutput: "Hello World!" }
-        ]
-    },
-    "reverse-string": {
-        id: "reverse-string",
-        title: "2. Reverse String",
-        difficulty: "Easy",
-        category: "Strings",
-        language: "cpp",
-        description: (
-            <div className="space-y-4">
-                <p>Write a function that reverses a string. The input string is given as an array of characters.</p>
-                <p>You must do this by modifying the input array in-place.</p>
-
-                <div className="bg-muted p-4 rounded-lg mt-4 border border-border">
-                    <h4 className="font-semibold mb-2">Example 1:</h4>
-                    <pre className="font-mono text-sm">
-                        <span className="text-muted-foreground">Input:</span> s = ["h","e","l","l","o"]<br />
-                        <span className="text-muted-foreground">Output:</span> ["o","l","l","e","h"]
-                    </pre>
-                </div>
-            </div>
-        ),
-        template: '#include <iostream>\n#include <vector>\n#include <string>\n\nusing namespace std;\n\nvoid reverseString(vector<char>& s) {\n    // Write your code here\n    \n}\n\nint main() {\n    // Testing code provided in execution environment\n    return 0;\n}',
-        testCases: [
-            { input: "hello", expectedOutput: "olleh" },
-            { input: "Hannah", expectedOutput: "hannaH" }
-        ]
-    }
-};
+import { fallbackProblems } from "@/data/fallbackProblems";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Lock } from "lucide-react";
 
 export default function ProblemPage() {
     const params = useParams();
+    const { data: session, status } = useSession();
     const [prob, setProb] = useState<ProblemDefinition | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const id = params?.id as string;
-        // Check default hardcoded first
-        if (problemData[id]) {
-            setProb(problemData[id]);
-        } else {
-            // Check local storage
-            import("@/lib/problems").then(({ getCustomProblems }) => {
-                const customProblems = getCustomProblems();
-                const found = customProblems.find(p => p.id === id);
-                if (found) {
-                    setProb(found);
+        if (!id) return;
+
+        fetch(`/api/problems/${id}`)
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error("Problem not found");
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (!data || !data.problem) throw new Error("Problem not found in response");
+
+                const mappedProblem: ProblemDefinition = {
+                    ...data.problem,
+                    id: data.problem.problemId || data.problem._id
+                };
+                setProb(mappedProblem);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error("Error loading problem from DB, checking fallbacks...", err);
+
+                // Fallback rendering
+                if (fallbackProblems[id]) {
+                    setProb(fallbackProblems[id]);
                 }
                 setLoading(false);
-            }).catch(console.error);
-            return;
-        }
-        setLoading(false);
+            });
     }, [params?.id]);
 
-    if (loading) return <div className="p-10 text-center">Loading problem...</div>;
+    if (loading || status === "loading") return <div className="p-10 text-center animate-pulse min-h-[calc(100vh-3.5rem)] flex items-center justify-center font-medium">Loading computational environment...</div>;
+
+    // Must be logged in
+    if (!session) {
+        return (
+            <div className="w-full h-[calc(100vh-3.5rem)] bg-background flex flex-col items-center justify-center space-y-4">
+                <Lock className="w-16 h-16 text-muted-foreground opacity-50 mb-2" />
+                <h2 className="text-3xl font-bold tracking-tight">Authentication Required</h2>
+                <p className="text-muted-foreground max-w-md text-center">
+                    You must be logged in to access the MagicCode problem engine and save your progress to your profile.
+                </p>
+                <div className="flex gap-4 mt-6">
+                    <Button asChild size="lg"><Link href="/login">Login Now</Link></Button>
+                    <Button asChild variant="outline" size="lg"><Link href="/signup">Create Account</Link></Button>
+                </div>
+            </div>
+        );
+    }
 
     if (!prob) {
         return notFound();

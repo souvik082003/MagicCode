@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CodeEditor } from "./CodeEditor";
+import { SolutionsTab } from "./SolutionsTab";
 import { executeCode } from "@/lib/piston";
 import { Play, Loader2, CheckCircle2, XCircle, Terminal, List, ChevronLeft, ChevronRight, Shuffle, CloudUpload, Settings, FileText, FlaskConical, Beaker, CheckSquare, Maximize2, RotateCcw, SquareTerminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 import { useProgress } from "@/lib/progress";
 import { ProblemDefinition, SupportedLanguage } from "@/types/problem";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface WorkspaceProps {
     problem: ProblemDefinition;
@@ -25,6 +27,7 @@ interface TestCaseResult {
     input: string;
     expectedOutput: string;
     actualOutput: string;
+    consoleOutput?: string;
     error?: string;
 }
 
@@ -50,6 +53,9 @@ export function Workspace({ problem }: WorkspaceProps) {
                 case "python":
                     setCode('# Python 3 snippet\ndef main():\n    pass\n\nif __name__ == "__main__":\n    main()');
                     break;
+                case "java":
+                    setCode('public class Main {\n    public static void main(String[] args) {\n        // Write Java code here\n    }\n}');
+                    break;
             }
         }
     };
@@ -57,82 +63,164 @@ export function Workspace({ problem }: WorkspaceProps) {
     // Execution State
     const [isRunning, setIsRunning] = useState(false);
     const [activeRightTab, setActiveRightTab] = useState("testcase");
+    const [activeTestCaseIdx, setActiveTestCaseIdx] = useState(0);
 
     // Outputs
-    const [customInput, setCustomInput] = useState("");
-    const [customOutput, setCustomOutput] = useState("");
-    const [customError, setCustomError] = useState("");
     const [testResults, setTestResults] = useState<TestCaseResult[] | null>(null);
 
     const { markProblemCompleted } = useProgress();
 
-    const handleRunCode = async (isTestMode: boolean) => {
+    // Problem Sequence Navigation
+    const router = useRouter();
+    const [problemSequence, setProblemSequence] = useState<string[]>([]);
+
+    // Fetch user preferences and problem sequence
+    useEffect(() => {
+        fetch("/api/settings")
+            .then(res => res.json())
+            .then(data => {
+                if (data.settings?.defaultLanguage) {
+                    const lang = data.settings.defaultLanguage as SupportedLanguage;
+                    if (lang !== problem.language) {
+                        handleLanguageChange(lang);
+                    }
+                }
+            })
+            .catch(console.error);
+
+        // Fetch sequence to power Next/Prev navigation
+        fetch("/api/problems")
+            .then(res => res.json())
+            .then(data => {
+                if (data.problems) {
+                    // Pull standard sequential ID map
+                    const fetchedIds = data.problems.map((p: any) => p.problemId || p.id).reverse();
+
+                    // Prepend default fallback IDs just like the main directory
+                    const defaultIds = ["hello-world", "variables", "two-sum", "reverse-string", "linked-list-cycle", "pointers-intro"];
+                    const allIds = Array.from(new Set([...defaultIds, ...fetchedIds]));
+
+                    setProblemSequence(allIds);
+                }
+            })
+            .catch(console.error);
+    }, []);
+
+    const handleNavigate = (direction: 'prev' | 'next' | 'shuffle') => {
+        if (problemSequence.length === 0) return;
+
+        const currentIndex = problemSequence.indexOf(problem.id);
+        let targetId = null;
+
+        if (direction === 'shuffle') {
+            const randomIndex = Math.floor(Math.random() * problemSequence.length);
+            targetId = problemSequence[randomIndex];
+        } else if (direction === 'prev' && currentIndex > 0) {
+            targetId = problemSequence[currentIndex - 1];
+        } else if (direction === 'next' && currentIndex < problemSequence.length - 1) {
+            targetId = problemSequence[currentIndex + 1];
+        }
+
+        if (targetId && targetId !== problem.id) {
+            router.push(`/problems/${targetId}`);
+        } else if (!targetId && direction !== 'shuffle') {
+            toast.info(direction === 'next' ? "You are at the last problem!" : "This is the first problem.");
+        }
+    };
+
+    const handleRunCode = async (isSubmit: boolean) => {
         setIsRunning(true);
-        setCustomOutput("");
-        setCustomError("");
+        setActiveRightTab("testresult");
+        setTestResults(null);
 
         try {
-            if (isTestMode && problem.testCases && problem.testCases.length > 0) {
-                setActiveRightTab("testresult");
-                setTestResults(null);
+            // Apply driver code macro substitution if exists
+            let finalCode = code;
+            if (problem.driverCode) {
+                if (problem.driverCode.includes("{{USER_CODE}}")) {
+                    finalCode = problem.driverCode.replace("{{USER_CODE}}", code);
+                } else {
+                    finalCode = problem.driverCode + "\n" + code;
+                }
+            }
 
-                const results: TestCaseResult[] = [];
-                let allPassed = true;
+            const results: TestCaseResult[] = [];
+            let allPassed = true;
 
-                for (const tc of problem.testCases) {
-                    const res = await executeCode(language, code, tc.input);
+            const testCasesToRun = problem.testCases || [];
 
-                    if (res.compile_output || res.code !== 0) {
-                        results.push({
-                            passed: false,
-                            input: tc.input,
-                            expectedOutput: tc.expectedOutput,
-                            actualOutput: res.stdout,
-                            error: res.compile_output || res.stderr || "Execution failed"
-                        });
-                        allPassed = false;
-                        continue;
-                    }
+            if (testCasesToRun.length === 0) {
+                toast.error("No test cases defined for this problem.");
+                setIsRunning(false);
+                return;
+            }
 
-                    const actualOutput = res.stdout.trim();
-                    const passed = actualOutput === tc.expectedOutput.trim();
-                    if (!passed) allPassed = false;
+            for (const tc of testCasesToRun) {
+                const res = await executeCode(language, finalCode, tc.input);
 
+                if (res.compile_output || res.code !== 0) {
                     results.push({
-                        passed,
+                        passed: false,
                         input: tc.input,
                         expectedOutput: tc.expectedOutput,
-                        actualOutput: actualOutput
+                        actualOutput: res.stdout,
+                        consoleOutput: res.stdout,
+                        error: res.compile_output || res.stderr || "Execution failed"
                     });
+                    allPassed = false;
+                    continue;
                 }
 
-                setTestResults(results);
+                const actualOutput = res.stdout.trim();
+                const passed = actualOutput === tc.expectedOutput.trim();
+                if (!passed) allPassed = false;
 
-                if (allPassed) {
-                    toast.success("Accepted", { style: { background: '#22c55e', color: 'white' } });
-                    markProblemCompleted(problem.id);
-                } else {
-                    toast.error("Wrong Answer");
-                }
+                results.push({
+                    passed,
+                    input: tc.input,
+                    expectedOutput: tc.expectedOutput,
+                    actualOutput: actualOutput,
+                    consoleOutput: res.stdout
+                });
+            }
 
+            setTestResults(results);
+
+            const finalStatus = allPassed ? "Accepted" : "Wrong Answer";
+
+            if (allPassed) {
+                toast.success(isSubmit ? "Submission Accepted!" : "Run Successful", { style: { background: '#22c55e', color: 'white' } });
+                if (isSubmit) markProblemCompleted(problem.id);
             } else {
-                // Custom Run Mode
-                setActiveRightTab("terminal");
-                const result = await executeCode(language, code, customInput);
-                if (result.compile_output) {
-                    setCustomError(result.compile_output);
-                    toast.error("Compilation Error");
-                } else if (result.stderr) {
-                    setCustomError(result.stderr);
-                    toast.error("Execution Error");
-                } else {
-                    setCustomOutput(result.stdout);
-                    toast.success("Executed successfully");
+                toast.error(isSubmit ? "Submission failed" : "Test Cases Failed");
+            }
+
+            // Send submission to backend only if it's an actual submit
+            if (isSubmit) {
+                try {
+                    await fetch("/api/submissions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            problemId: problem.id,
+                            code: code,
+                            status: finalStatus,
+                            language: language
+                        })
+                    });
+                } catch (err) {
+                    console.error("Failed to record submission", err);
                 }
             }
         } catch (_err) {
-            setCustomError("Internal Error");
             toast.error("Execution Service Unavailable");
+            setTestResults([{
+                passed: false,
+                input: "",
+                expectedOutput: "",
+                actualOutput: "",
+                error: "Internal Error: Could not reach execution service."
+            }]);
         } finally {
             setIsRunning(false);
         }
@@ -149,13 +237,13 @@ export function Workspace({ problem }: WorkspaceProps) {
                         </Link>
                     </Button>
                     <div className="flex items-center gap-0.5 ml-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-white/5 disabled:opacity-50">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-white/5 disabled:opacity-50" onClick={() => handleNavigate('prev')}>
                             <ChevronLeft className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-white/5 disabled:opacity-50">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-white/5 disabled:opacity-50" onClick={() => handleNavigate('next')}>
                             <ChevronRight className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-white/5">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-white/5" onClick={() => handleNavigate('shuffle')}>
                             <Shuffle className="w-4 h-4" />
                         </Button>
                     </div>
@@ -201,7 +289,7 @@ export function Workspace({ problem }: WorkspaceProps) {
                     <ResizablePanel defaultSize={45} minSize={30} className="bg-[#282828] rounded-lg border border-zinc-800/80 flex flex-col overflow-hidden">
                         <Tabs defaultValue="description" className="flex flex-col h-full bg-[#282828]">
                             <div className="flex items-center justify-between px-2 bg-[#282828] border-b border-zinc-800">
-                                <TabsList className="bg-transparent h-10 p-0 overflow-x-auto justify-start flex-nowrap">
+                                <TabsList className="bg-transparent h-10 p-0 overflow-hidden justify-start flex-nowrap">
                                     <TabsTrigger value="description" className="data-[state=active]:bg-zinc-800/50 data-[state=active]:text-zinc-100 text-zinc-400 rounded-md h-8 text-xs font-medium border-none data-[state=active]:shadow-none px-3 mx-1">
                                         <FileText className="w-3.5 h-3.5 mr-1.5 text-blue-400" /> Description
                                     </TabsTrigger>
@@ -223,20 +311,30 @@ export function Workspace({ problem }: WorkspaceProps) {
                                         <h1 className="text-2xl font-bold text-zinc-100 mb-4 tracking-tight">{problem.title}</h1>
 
                                         <div className="flex flex-wrap gap-3 mb-8">
-                                            <span className={`px-3 py-1 text-xs rounded-full font-medium ${problem.difficulty === "Easy" ? "bg-green-500/10 text-green-400" :
-                                                problem.difficulty === "Medium" ? "bg-yellow-500/10 text-yellow-400" :
-                                                    "bg-red-500/10 text-red-400"
+                                            <span className={`px-3 py-1 text-xs rounded-full font-medium ${problem.difficulty === "Easy" ? "bg-green-500/10 text-green-400 border border-green-500/20" :
+                                                problem.difficulty === "Medium" ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20" :
+                                                    "bg-red-500/10 text-red-400 border border-red-500/20"
                                                 }`}>
                                                 {problem.difficulty}
                                             </span>
                                             <span className="px-3 py-1 text-xs rounded-full font-medium bg-zinc-800 text-zinc-300 border border-zinc-700/50">
                                                 {problem.category}
                                             </span>
+                                            <span className={`px-3 py-1 text-xs rounded-full font-medium ${problem.isCustom ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-blue-500/10 text-blue-400 border border-blue-500/20"}`}>
+                                                {problem.isCustom ? `User Submitted by ${problem.authorName || "Anonymous"}` : "Official Problem"}
+                                            </span>
+                                            {problem.solvers !== undefined && (
+                                                <span className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-full font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    {problem.solvers.length} {problem.solvers.length === 1 ? 'Solve' : 'Solves'}
+                                                </span>
+                                            )}
                                         </div>
 
-                                        <div className="prose prose-invert prose-p:text-zinc-300 prose-p:leading-relaxed prose-pre:bg-[#1a1a1a] prose-pre:border prose-pre:border-zinc-800 max-w-none">
-                                            {problem.description}
-                                        </div>
+                                        <div
+                                            className="prose prose-invert prose-p:text-zinc-300 prose-p:leading-relaxed prose-pre:bg-[#1a1a1a] prose-pre:border prose-pre:border-zinc-800 max-w-none"
+                                            dangerouslySetInnerHTML={{ __html: problem.description as string }}
+                                        />
                                     </div>
                                 </ScrollArea>
                             </TabsContent>
@@ -244,8 +342,8 @@ export function Workspace({ problem }: WorkspaceProps) {
                             <TabsContent value="editorial" className="p-6 m-0 text-zinc-500 text-sm">
                                 Editorial content locked. Premium required.
                             </TabsContent>
-                            <TabsContent value="solutions" className="p-6 m-0 text-zinc-500 text-sm">
-                                Community solutions go here.
+                            <TabsContent value="solutions" className="m-0 h-full">
+                                <SolutionsTab problemId={problem.id} currentCode={code} currentLanguage={language} />
                             </TabsContent>
                             <TabsContent value="submissions" className="p-6 m-0 text-zinc-500 text-sm">
                                 Your past submissions history.
@@ -276,6 +374,7 @@ export function Workspace({ problem }: WorkspaceProps) {
                                             <SelectContent className="bg-[#282828] border-zinc-700 text-zinc-100 text-xs">
                                                 <SelectItem value="cpp">C++</SelectItem>
                                                 <SelectItem value="c">C</SelectItem>
+                                                <SelectItem value="java">Java</SelectItem>
                                                 <SelectItem value="javascript">JavaScript</SelectItem>
                                                 <SelectItem value="python">Python 3</SelectItem>
                                             </SelectContent>
@@ -298,59 +397,55 @@ export function Workspace({ problem }: WorkspaceProps) {
                             <ResizablePanel defaultSize={35} className="bg-[#282828] flex flex-col min-h-[100px]">
                                 <Tabs value={activeRightTab} onValueChange={setActiveRightTab} className="flex flex-col h-full w-full">
                                     <div className="flex items-center justify-between px-2 bg-[#282828] border-b border-zinc-800">
-                                        <TabsList className="bg-transparent h-10 p-0 overflow-x-auto justify-start flex-nowrap">
+                                        <TabsList className="bg-transparent h-10 p-0 overflow-hidden justify-start flex-nowrap">
                                             <TabsTrigger value="testcase" className="data-[state=active]:bg-zinc-800/50 data-[state=active]:text-zinc-100 text-zinc-400 rounded-md h-8 text-xs font-medium border-none data-[state=active]:shadow-none px-4 mx-1">
                                                 <Terminal className="w-3.5 h-3.5 mr-1.5 text-zinc-400" /> Testcase
                                             </TabsTrigger>
                                             <TabsTrigger value="testresult" className="data-[state=active]:bg-zinc-800/50 data-[state=active]:text-zinc-100 text-zinc-400 rounded-md h-8 text-xs font-medium border-none data-[state=active]:shadow-none px-4 mx-1">
                                                 <CheckSquare className="w-3.5 h-3.5 mr-1.5 text-green-500" /> Test Result
                                             </TabsTrigger>
-                                            <TabsTrigger value="terminal" className="data-[state=active]:bg-zinc-800/50 data-[state=active]:text-zinc-100 text-zinc-400 rounded-md h-8 text-xs font-medium border-none data-[state=active]:shadow-none px-4 mx-1">
-                                                <SquareTerminal className="w-3.5 h-3.5 mr-1.5 text-blue-400" /> Output
-                                            </TabsTrigger>
                                         </TabsList>
                                         <div className="pr-2 flex gap-1">
                                         </div>
                                     </div>
 
-                                    <ScrollArea className="flex-1 w-full relative bg-[#282828]">
+                                    <div className="flex-1 w-full flex flex-col bg-[#282828] overflow-y-auto min-h-0">
                                         {/* Testcase Input Tab */}
-                                        <TabsContent value="testcase" className="m-0 p-4 h-full outline-none">
+                                        <TabsContent value="testcase" className="m-0 p-4 outline-none">
                                             <div className="space-y-3">
                                                 <div className="flex items-center gap-3">
                                                     {problem.testCases?.map((tc, idx) => (
-                                                        <div key={idx} className={`px-4 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${idx === 0 ? 'bg-zinc-700 text-zinc-100' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-300'}`}>
+                                                        <div
+                                                            key={idx}
+                                                            onClick={() => setActiveTestCaseIdx(idx)}
+                                                            className={`px-4 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${idx === activeTestCaseIdx ? 'bg-zinc-700 text-zinc-100' : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-300'}`}
+                                                        >
                                                             Case {idx + 1}
                                                         </div>
                                                     ))}
                                                 </div>
 
-                                                <div className="space-y-4 pt-2">
-                                                    <div>
-                                                        <Label className="text-xs font-semibold text-zinc-500">Input (stdin/args)</Label>
-                                                        <Textarea
-                                                            className="mt-1.5 bg-zinc-900 border-none resize-none font-mono text-xs text-zinc-300 rounded-lg min-h-[60px] focus-visible:ring-1 focus-visible:ring-zinc-700"
-                                                            value={customInput || (problem.testCases?.[0]?.input || "")}
-                                                            onChange={(e) => setCustomInput(e.target.value)}
-                                                            placeholder="Example: 1 2 3"
-                                                        />
+                                                {problem.testCases && problem.testCases[activeTestCaseIdx] && (
+                                                    <div className="space-y-4 pt-2">
+                                                        <div>
+                                                            <Label className="text-xs font-semibold text-zinc-500">Input</Label>
+                                                            <div className="mt-1.5 bg-zinc-900/80 p-3 font-mono text-xs text-zinc-300 rounded-lg whitespace-pre-wrap border border-zinc-800/50">
+                                                                {problem.testCases[activeTestCaseIdx].input}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <Label className="text-xs font-semibold text-zinc-500">Expected Output</Label>
+                                                            <div className="mt-1.5 bg-zinc-900/80 p-3 font-mono text-xs text-zinc-300 rounded-lg whitespace-pre-wrap border border-zinc-800/50">
+                                                                {problem.testCases[activeTestCaseIdx].expectedOutput}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
-
-                                            {/* Showing Custom Run Execution result here if no explicit tab exists */}
-                                            {customOutput && !isRunning && (
-                                                <div className="mt-4 pt-4 border-t border-zinc-800">
-                                                    <Label className="text-xs font-semibold text-zinc-500">Output (stdout)</Label>
-                                                    <div className="mt-1.5 bg-zinc-900 p-3 rounded-lg font-mono text-xs text-zinc-300 whitespace-pre-wrap">
-                                                        {customOutput}
-                                                    </div>
-                                                </div>
-                                            )}
                                         </TabsContent>
 
                                         {/* Execution Results Tab */}
-                                        <TabsContent value="testresult" className="m-0 p-4 h-full outline-none">
+                                        <TabsContent value="testresult" className="m-0 p-4 outline-none">
                                             {isRunning && activeRightTab === "testresult" ? (
                                                 <div className="flex flex-col items-center justify-center h-32 space-y-4">
                                                     <Loader2 className="w-8 h-8 animate-spin text-green-500" />
@@ -375,7 +470,10 @@ export function Workspace({ problem }: WorkspaceProps) {
                                                     {/* Individual Test Cases Display */}
                                                     <div className="flex gap-2">
                                                         {testResults.map((result, idx) => (
-                                                            <div key={idx} className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border ${result.passed ? 'bg-zinc-800 border-zinc-700 text-zinc-200' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                                                            <div
+                                                                key={idx}
+                                                                onClick={() => setActiveTestCaseIdx(idx)}
+                                                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border ${activeTestCaseIdx === idx ? 'ring-2 ring-blue-500/50 ring-offset-2 ring-offset-[#282828] ' : ''}${result.passed ? 'bg-zinc-800 border-zinc-700 text-zinc-200' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
                                                                 <span className="flex items-center gap-1.5">
                                                                     <div className={`w-1.5 h-1.5 rounded-full ${result.passed ? 'bg-green-500' : 'bg-red-500'}`}></div>
                                                                     Case {idx + 1}
@@ -384,63 +482,63 @@ export function Workspace({ problem }: WorkspaceProps) {
                                                         ))}
                                                     </div>
 
-                                                    <div className="space-y-4 pt-2">
-                                                        {testResults[0].error && (
-                                                            <div>
-                                                                <Label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Error</Label>
-                                                                <div className="bg-red-500/10 text-red-400 p-3 rounded-lg font-mono text-xs whitespace-pre-wrap border border-red-500/20">
-                                                                    {testResults[0].error}
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                    <div className="space-y-4 pt-4">
+                                                        {(() => {
+                                                            const activeResult = testResults[activeTestCaseIdx] || testResults[0];
+                                                            return (
+                                                                <>
+                                                                    {activeResult.error && (
+                                                                        <div>
+                                                                            <Label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Error</Label>
+                                                                            <div className="bg-red-500/10 text-red-400 p-3 rounded-lg font-mono text-xs whitespace-pre-wrap border border-red-500/20">
+                                                                                {activeResult.error}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
 
-                                                        {testResults[0].input && (
-                                                            <div>
-                                                                <Label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Input</Label>
-                                                                <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-lg font-mono text-xs text-zinc-300">
-                                                                    {testResults[0].input}
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                                    {activeResult.input && (
+                                                                        <div>
+                                                                            <Label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Input</Label>
+                                                                            <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-lg font-mono text-xs text-zinc-300">
+                                                                                {activeResult.input}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
 
-                                                        <div>
-                                                            <Label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Output</Label>
-                                                            <div className={`bg-zinc-900 border p-3 rounded-lg font-mono text-xs whitespace-pre-wrap ${testResults[0].passed ? 'border-zinc-800 text-zinc-300' : 'border-red-500/30 text-red-400 bg-red-500/5'}`}>
-                                                                {testResults[0].actualOutput || <span className="text-zinc-600 italic">null</span>}
-                                                            </div>
-                                                        </div>
+                                                                    <div>
+                                                                        <Label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Output</Label>
+                                                                        <div className={`bg-zinc-900 border p-3 rounded-lg font-mono text-xs whitespace-pre-wrap ${activeResult.passed ? 'border-zinc-800 text-zinc-300' : 'border-red-500/30 text-red-400 bg-red-500/5'}`}>
+                                                                            {activeResult.actualOutput || <span className="text-zinc-600 italic">null</span>}
+                                                                        </div>
+                                                                    </div>
 
-                                                        <div>
-                                                            <Label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Expected</Label>
-                                                            <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-lg font-mono text-xs text-zinc-300 whitespace-pre-wrap">
-                                                                {testResults[0].expectedOutput}
-                                                            </div>
-                                                        </div>
+                                                                    <div>
+                                                                        <Label className="text-xs font-semibold text-zinc-500 mb-1.5 block">Expected</Label>
+                                                                        <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-lg font-mono text-xs text-zinc-300 whitespace-pre-wrap">
+                                                                            {activeResult.expectedOutput}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {activeResult.consoleOutput && activeResult.consoleOutput.trim() && !activeResult.error && (
+                                                                        <div>
+                                                                            <Label className="text-xs font-semibold text-zinc-500 mb-1.5 flex items-center gap-2">
+                                                                                <Terminal className="w-3.5 h-3.5" /> Console (Stdout)
+                                                                            </Label>
+                                                                            <div className="bg-[#1e1e1e] border border-zinc-800 p-3 rounded-lg font-mono text-xs text-zinc-400 whitespace-pre-wrap">
+                                                                                {activeResult.consoleOutput}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </div>
                                             )}
                                         </TabsContent>
 
-                                        {/* Output/Terminal Tab */}
-                                        <TabsContent value="terminal" className="m-0 p-4 h-full flex flex-col outline-none">
-                                            {isRunning && activeRightTab === "terminal" ? (
-                                                <div className="flex flex-col items-center justify-center h-32 space-y-4">
-                                                    <Loader2 className="w-8 h-8 animate-spin text-green-500" />
-                                                    <p className="text-zinc-400 text-sm animate-pulse">Executing code...</p>
-                                                </div>
-                                            ) : (
-                                                <div className="flex-1 bg-zinc-950 p-4 rounded-lg font-mono text-sm overflow-auto border border-zinc-800 tracking-tight leading-relaxed min-h-[150px]">
-                                                    {customError ? (
-                                                        <div className="text-red-400 whitespace-pre-wrap">{customError}</div>
-                                                    ) : customOutput ? (
-                                                        <div className="text-zinc-300 whitespace-pre-wrap">{customOutput}</div>
-                                                    ) : (
-                                                        <div className="text-zinc-500/80 italic text-center mt-10">Run code to see output...</div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </TabsContent>
-                                    </ScrollArea>
+                                        {/* Removed terminal output block as run/submit utilizes visual Result testcase diffs instead */}
+                                    </div>
                                 </Tabs>
                             </ResizablePanel>
                         </ResizablePanelGroup>

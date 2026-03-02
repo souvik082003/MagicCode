@@ -14,6 +14,13 @@ export interface ProblemDefinition {
     language: SupportedLanguage;
     description: React.ReactNode | string;
     template: string;
+    driverCode?: string;
+    authorName?: string;
+    solvers?: string[];
+    companies?: string[];
+    topics?: string[];
+    createdAt?: string;
+    problemNumber?: number;
     testCases: TestCase[];
     isCustom?: boolean;
 }
