@@ -38,7 +38,13 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
     try {
         await connectToDatabase();
-        const problems = await Problem.find({ status: { $nin: ["pending", "rejected"] } }).sort({ createdAt: -1 });
+
+        const url = new URL(req.url);
+        const all = url.searchParams.get("all");
+
+        // If ?all=true, return all problems (for admin ID lookup)
+        const filter = all === "true" ? {} : { status: { $nin: ["pending", "rejected"] } };
+        const problems = await Problem.find(filter).sort({ createdAt: -1 });
 
         return NextResponse.json({ problems }, { status: 200 });
     } catch (error: any) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SupportedLanguage, TestCase } from "@/types/problem";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,32 @@ export default function AdminAddProblemPage() {
     const [companies, setCompanies] = useState("");
     const [topics, setTopics] = useState("");
     const [testCases, setTestCases] = useState<TestCase[]>([{ input: "", expectedOutput: "" }]);
+    const [problemId, setProblemId] = useState("");
+    const [loadingId, setLoadingId] = useState(true);
+
+    // Auto-generate next MC ID on mount
+    useEffect(() => {
+        fetch("/api/problems?all=true")
+            .then(res => res.json())
+            .then(data => {
+                if (data.problems) {
+                    // Find the highest MC number
+                    let maxNum = 0;
+                    data.problems.forEach((p: any) => {
+                        const match = (p.problemId || "").match(/^mc(\d+)$/i);
+                        if (match) {
+                            const num = parseInt(match[1], 10);
+                            if (num > maxNum) maxNum = num;
+                        }
+                    });
+                    const nextNum = maxNum + 1;
+                    const nextId = `MC${String(nextNum).padStart(2, '0')}`;
+                    setProblemId(nextId);
+                }
+            })
+            .catch(console.error)
+            .finally(() => setLoadingId(false));
+    }, []);
 
     const handleAddTestCase = () => {
         setTestCases([...testCases, { input: "", expectedOutput: "" }]);
@@ -59,13 +85,13 @@ export default function AdminAddProblemPage() {
             return;
         }
 
-        const problemId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + "-" + Date.now().toString().slice(-4);
+        const finalProblemId = problemId.trim() || title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + "-" + Date.now().toString().slice(-4);
 
         const companyArray = companies.split(",").map(c => c.trim()).filter(c => c !== "");
         const topicArray = topics.split(",").map(t => t.trim()).filter(t => t !== "");
 
         const newProblem = {
-            problemId,
+            problemId: finalProblemId,
             title,
             difficulty,
             category,
@@ -128,6 +154,20 @@ export default function AdminAddProblemPage() {
                                 className="bg-zinc-950 border-zinc-800"
                                 required
                             />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="problemId" className="text-zinc-300">Problem ID (MC Code)</Label>
+                            <div className="flex items-center gap-3">
+                                <Input
+                                    id="problemId"
+                                    value={problemId}
+                                    onChange={(e) => setProblemId(e.target.value.toUpperCase())}
+                                    placeholder={loadingId ? "Loading..." : "e.g. MC01"}
+                                    className="bg-zinc-950 border-zinc-800 font-mono text-lg tracking-wider max-w-[200px]"
+                                />
+                                <span className="text-xs text-zinc-500">Auto-generated. Edit if needed.</span>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
