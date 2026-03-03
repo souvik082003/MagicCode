@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
     try {
         await connectToDatabase();
-        const problems = await Problem.find({}).sort({ createdAt: -1 });
+        const problems = await Problem.find({ status: { $nin: ["pending", "rejected"] } }).sort({ createdAt: -1 });
 
         return NextResponse.json({ problems }, { status: 200 });
     } catch (error: any) {

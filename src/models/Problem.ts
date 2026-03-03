@@ -15,6 +15,8 @@ export interface IProblem extends Document {
     template: string;
     driverCode?: string;
     authorName?: string;
+    submittedBy?: string;
+    status: "approved" | "pending" | "rejected";
     companies?: string[];
     topics?: string[];
     testCases: ITestCase[];
@@ -36,6 +38,8 @@ const ProblemSchema = new Schema<IProblem>(
         template: { type: String, default: "" },
         driverCode: { type: String, default: "" },
         authorName: { type: String, default: "System" },
+        submittedBy: { type: String, default: "" },
+        status: { type: String, enum: ["approved", "pending", "rejected"], default: "approved" },
         companies: [{ type: String }],
         topics: [{ type: String }],
         testCases: [TestCaseSchema],

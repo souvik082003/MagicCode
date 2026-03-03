@@ -20,6 +20,7 @@ export interface ProblemDefinition {
     companies?: string[];
     topics?: string[];
     createdAt?: string;
+    submittedBy?: string;
     problemNumber?: number;
     testCases: TestCase[];
     isCustom?: boolean;

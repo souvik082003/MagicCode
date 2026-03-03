@@ -6,13 +6,14 @@ import { motion } from "framer-motion";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Code2, CheckCircle2, Search, Zap, BookOpen, Star, Building2, FilterX } from "lucide-react";
+import { Trophy, Code2, CheckCircle2, Search, Zap, BookOpen, Star, Building2, FilterX, PlusCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProgress } from "@/lib/progress";
 import { ProblemDefinition } from "@/types/problem";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 
 import { fallbackProblems } from "@/data/fallbackProblems";
 
@@ -27,6 +28,7 @@ const defaultProblems: Partial<ProblemDefinition>[] = Object.values(fallbackProb
 
 export default function ProblemsPage() {
     const { isProblemCompleted } = useProgress();
+    const { data: session } = useSession();
     const [searchQuery, setSearchQuery] = useState("");
     const [difficultyTab, setDifficultyTab] = useState("all");
     const [sourceTab, setSourceTab] = useState("all");
@@ -118,18 +120,28 @@ export default function ProblemsPage() {
                     </p>
                 </div>
 
-                {/* Stats Card */}
-                <Card className="w-full md:w-auto min-w-[300px] border-primary/20 bg-primary/5">
-                    <CardContent className="p-4">
-                        <div className="flex justify-between items-center mb-2">
-                            <span className="font-semibold text-sm uppercase tracking-wider flex items-center gap-2">
-                                <Star className="w-4 h-4 text-primary" /> Overall Progress
-                            </span>
-                            <span className="font-bold">{completedCount} / {problems.length}</span>
-                        </div>
-                        <Progress value={progressPercentage} className="h-2" />
-                    </CardContent>
-                </Card>
+                <div className="flex flex-col gap-3 items-end">
+                    {/* Stats Card */}
+                    <Card className="w-full md:w-auto min-w-[300px] border-primary/20 bg-primary/5">
+                        <CardContent className="p-4">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="font-semibold text-sm uppercase tracking-wider flex items-center gap-2">
+                                    <Star className="w-4 h-4 text-primary" /> Overall Progress
+                                </span>
+                                <span className="font-bold">{completedCount} / {problems.length}</span>
+                            </div>
+                            <Progress value={progressPercentage} className="h-2" />
+                        </CardContent>
+                    </Card>
+
+                    {session?.user && (
+                        <Button asChild className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white">
+                            <Link href="/problems/submit">
+                                <PlusCircle className="w-4 h-4 mr-2" /> Submit a Question
+                            </Link>
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Controls Section */}
@@ -254,6 +266,9 @@ export default function ProblemsPage() {
                                     <div className="flex justify-between items-center mt-2">
                                         <CardDescription className="flex items-center gap-2">
                                             <Code2 className="w-4 h-4" /> {prob.language}
+                                            {prob.submittedBy && (
+                                                <span className="text-xs text-blue-400 ml-2">By: {prob.submittedBy}</span>
+                                            )}
                                         </CardDescription>
 
                                         {/* Company preview chips on card */}

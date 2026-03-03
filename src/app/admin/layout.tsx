@@ -52,6 +52,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                         <Link href="/admin/users" className="block px-4 py-2.5 rounded-lg text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 font-medium text-sm transition-colors">
                             Manage Users
                         </Link>
+                        <Link href="/admin/reviews" className="block px-4 py-2.5 rounded-lg text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 font-medium text-sm transition-colors">
+                            Review Submissions
+                        </Link>
                     </nav>
                 </div>
                 {/* Admin Content Area */}
