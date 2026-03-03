@@ -103,67 +103,69 @@ export default function PlaygroundPage() {
             {/* Main IDE area */}
             <div className="flex-1 overflow-hidden p-2 flex flex-col h-[calc(100vh-3.5rem)]">
                 {/* @ts-expect-error missing strict types */}
-                <ResizablePanelGroup direction="vertical" className="w-full flex-grow rounded-lg border border-zinc-800/80 overflow-hidden bg-[#1e1e1e]">
-                    {/* Top Section: Editor + Input Side by Side */}
-                    <ResizablePanel defaultSize={70} className="relative flex flex-col bg-[#1e1e1e] h-full">
+                <ResizablePanelGroup direction="horizontal" className="w-full flex-grow rounded-lg border border-zinc-800/80 overflow-hidden bg-[#1e1e1e]">
+
+                    {/* Code Editor Panel (Left) */}
+                    <ResizablePanel defaultSize={65} className="relative flex flex-col bg-[#1e1e1e] h-full">
+                        <div className="flex-none h-9 bg-[#282828] border-b border-zinc-800 flex items-center px-4">
+                            <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400">main.{language === "javascript" ? "js" : language === "python" ? "py" : language}</span>
+                        </div>
+                        <div className="flex-1 relative w-full h-full">
+                            <CodeEditor language={language} code={code} onChange={(v) => setCode(v || "")} />
+                        </div>
+                    </ResizablePanel>
+
+                    <ResizableHandle className="w-1.5 bg-zinc-800/50 hover:bg-zinc-700 active:bg-blue-500/50 transition-colors cursor-col-resize z-10" />
+
+                    {/* Terminal & Input Panel (Right) */}
+                    <ResizablePanel defaultSize={35} className="bg-[#1e1e1e] flex flex-col h-full">
                         {/* @ts-expect-error missing strict types */}
-                        <ResizablePanelGroup direction="horizontal" className="flex-1">
-                            {/* Code Editor Panel */}
-                            <ResizablePanel defaultSize={75} className="relative flex flex-col bg-[#1e1e1e] h-full">
+                        <ResizablePanelGroup direction="vertical" className="w-full h-full">
+
+                            {/* Terminal Output (Top Right) */}
+                            <ResizablePanel defaultSize={70} className="flex flex-col bg-[#0a0a0a]">
                                 <div className="flex-none h-9 bg-[#282828] border-b border-zinc-800 flex items-center px-4">
-                                    <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Editor</span>
+                                    <div className="flex items-center gap-2">
+                                        <SquareTerminal className="w-3.5 h-3.5 text-blue-400" />
+                                        <span className="text-xs font-semibold uppercase tracking-widest text-zinc-200">Terminal Output</span>
+                                    </div>
                                 </div>
-                                <div className="flex-1 relative w-full h-full">
-                                    <CodeEditor language={language} code={code} onChange={(v) => setCode(v || "")} />
-                                </div>
+                                <ScrollArea className="flex-1 w-full p-4 text-sm font-mono h-full">
+                                    {isRunning ? (
+                                        <div className="flex flex-col items-center justify-center h-full min-h-[100px] space-y-4">
+                                            <Loader2 className="w-6 h-6 animate-spin text-green-500" />
+                                            <p className="text-zinc-500 text-xs animate-pulse">Running...</p>
+                                        </div>
+                                    ) : error ? (
+                                        <div className="text-red-400 whitespace-pre-wrap">{error}</div>
+                                    ) : output ? (
+                                        <div className="text-zinc-300 whitespace-pre-wrap">{output}</div>
+                                    ) : (
+                                        <div className="text-zinc-500/80 italic text-sm mt-2">Click "Run Code" to see the output here.</div>
+                                    )}
+                                </ScrollArea>
                             </ResizablePanel>
 
-                            <ResizableHandle className="w-1.5 bg-zinc-800/50 hover:bg-zinc-700 active:bg-blue-500/50 transition-colors cursor-col-resize z-10" />
+                            <ResizableHandle className="h-1.5 bg-zinc-800/50 hover:bg-zinc-700 active:bg-blue-500/50 transition-colors cursor-row-resize z-10" />
 
-                            {/* Stdin Input Panel */}
-                            <ResizablePanel defaultSize={25} className="flex flex-col bg-[#282828] h-full">
+                            {/* Stdin Input (Bottom Right) */}
+                            <ResizablePanel defaultSize={30} className="flex flex-col bg-[#1A1A1A]">
                                 <div className="flex-none h-9 bg-[#282828] border-b border-zinc-800 flex items-center px-4">
                                     <div className="flex items-center gap-2">
                                         <Keyboard className="w-3.5 h-3.5 text-amber-400" />
-                                        <span className="text-xs font-semibold uppercase tracking-widest text-zinc-200">Input</span>
+                                        <span className="text-xs font-semibold uppercase tracking-widest text-zinc-200">Standard Input (stdin)</span>
                                     </div>
                                 </div>
                                 <textarea
                                     value={stdin}
                                     onChange={(e) => setStdin(e.target.value)}
-                                    placeholder="Enter your input here (stdin)...&#10;e.g. 42&#10;or multiple lines:
-3&#10;10 20 30"
-                                    className="flex-1 w-full bg-[#1A1A1A] text-zinc-300 font-mono text-sm p-4 resize-none outline-none focus:ring-1 focus:ring-blue-500/30 placeholder:text-zinc-600"
+                                    placeholder="Enter your input here..."
+                                    className="flex-1 w-full bg-transparent text-zinc-300 font-mono text-sm p-4 resize-none outline-none focus:ring-1 focus:ring-blue-500/30 placeholder:text-zinc-600"
                                     spellCheck={false}
                                 />
                             </ResizablePanel>
+
                         </ResizablePanelGroup>
-                    </ResizablePanel>
-
-                    <ResizableHandle className="h-1.5 bg-zinc-800/50 hover:bg-zinc-700 active:bg-blue-500/50 transition-colors cursor-row-resize z-10" />
-
-                    {/* Terminal Output Panel */}
-                    <ResizablePanel defaultSize={30} className="bg-[#282828] flex flex-col min-h-[100px] h-full">
-                        <div className="flex-none h-9 bg-[#282828] border-b border-zinc-800 flex items-center px-4">
-                            <div className="flex items-center gap-2">
-                                <SquareTerminal className="w-3.5 h-3.5 text-blue-400" />
-                                <span className="text-xs font-semibold uppercase tracking-widest text-zinc-200">Terminal</span>
-                            </div>
-                        </div>
-                        <ScrollArea className="flex-1 w-full bg-[#1A1A1A] p-4 text-sm font-mono h-full">
-                            {isRunning ? (
-                                <div className="flex flex-col items-center justify-center h-full min-h-[100px] space-y-4">
-                                    <Loader2 className="w-6 h-6 animate-spin text-green-500" />
-                                    <p className="text-zinc-500 text-xs animate-pulse">Computing...</p>
-                                </div>
-                            ) : error ? (
-                                <div className="text-red-400 whitespace-pre-wrap">{error}</div>
-                            ) : output ? (
-                                <div className="text-zinc-300 whitespace-pre-wrap">{output}</div>
-                            ) : (
-                                <div className="text-zinc-500/80 italic text-sm mt-2">Waiting for code execution...</div>
-                            )}
-                        </ScrollArea>
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>
