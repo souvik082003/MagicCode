@@ -33,6 +33,8 @@ export default function AdminAddProblemPage() {
 
     // Structured description fields
     const [problemStatement, setProblemStatement] = useState("");
+    const [inputFormat, setInputFormat] = useState("");
+    const [outputFormat, setOutputFormat] = useState("");
     const [examples, setExamples] = useState([{ input: "", output: "", explanation: "", image: "" }]);
     const [constraints, setConstraints] = useState("");
     const [imageUrl, setImageUrl] = useState("");
@@ -86,6 +88,12 @@ export default function AdminAddProblemPage() {
         }
         if (imageUrl.trim()) {
             html += `<img src="${imageUrl}" alt="Problem illustration" style="max-width:100%; border-radius:8px; margin:16px 0;" />\n`;
+        }
+        if (inputFormat.trim()) {
+            html += `<h4 style="margin-top:24px;margin-bottom:8px">Input Format</h4>\n<p>${inputFormat.replace(/\n/g, '<br/>')}</p>\n`;
+        }
+        if (outputFormat.trim()) {
+            html += `<h4 style="margin-top:20px;margin-bottom:8px">Output Format</h4>\n<p>${outputFormat.replace(/\n/g, '<br/>')}</p>\n`;
         }
         examples.forEach((ex, i) => {
             if (ex.input.trim() || ex.output.trim() || ex.image) {
@@ -334,9 +342,31 @@ export default function AdminAddProblemPage() {
                                     <Textarea
                                         value={problemStatement}
                                         onChange={(e) => setProblemStatement(e.target.value)}
-                                        placeholder="Given an n × n 2D matrix, rotate the image by 90 degrees (clockwise). You have to rotate the image in-place."
+                                        placeholder="Given an m × n matrix, complete the spiral rotation..."
                                         className="min-h-[100px] bg-zinc-950 border-zinc-800 text-sm text-zinc-100"
                                     />
+                                </div>
+
+                                {/* Input / Output Format */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <Label className="text-zinc-300">Input Format <span className="text-red-500">*</span></Label>
+                                        <Textarea
+                                            value={inputFormat}
+                                            onChange={(e) => setInputFormat(e.target.value)}
+                                            placeholder="First line contains two integers m and n.\nNext m lines contain n integers each."
+                                            className="min-h-[80px] bg-zinc-950 border-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-600"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-zinc-300">Output Format <span className="text-red-500">*</span></Label>
+                                        <Textarea
+                                            value={outputFormat}
+                                            onChange={(e) => setOutputFormat(e.target.value)}
+                                            placeholder="Print the elements of the matrix in spiral order formatted as [1,2,3...]"
+                                            className="min-h-[80px] bg-zinc-950 border-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-600"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Image Upload */}
@@ -538,7 +568,7 @@ export default function AdminAddProblemPage() {
                         <div className="space-y-2">
                             <Label htmlFor="driverCode" className="text-zinc-300">Hidden Driver Code (Optional) </Label>
                             <CardDescription className="mb-2 text-zinc-500">
-                                Use the <code className="bg-zinc-900 px-1 py-0.5 rounded text-white border border-zinc-800">{"{{USER_CODE}}"}</code> macro to inject the user's submitted solution block into a hidden <code className="bg-zinc-900 px-1 py-0.5 rounded text-white border border-zinc-800">main()</code> function.
+                                Use the <code className="bg-zinc-900 px-1 py-0.5 rounded text-white border border-zinc-800">{"{{USER_CODE}}"}</code> macro to inject the user's submitted solution block into a hidden <code className="bg-zinc-900 px-1 py-0.5 rounded text-white border border-zinc-800">main()</code> function. Leave blank for Codeforces-style raw execution.
                             </CardDescription>
                             <Textarea
                                 id="driverCode"

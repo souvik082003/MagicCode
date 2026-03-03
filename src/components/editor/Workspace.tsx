@@ -155,7 +155,7 @@ export function Workspace({ problem }: WorkspaceProps) {
         setTestResults(null);
 
         try {
-            // Apply driver code macro substitution if exists
+            // Support both Leetcode and Codeforces styles
             let finalCode = code;
             if (problem.driverCode) {
                 if (problem.driverCode.includes("{{USER_CODE}}")) {
