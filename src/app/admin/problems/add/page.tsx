@@ -566,11 +566,11 @@ export default function AdminAddProblemPage() {
 
                             <Tabs value={activeLangTab} onValueChange={(v) => setActiveLangTab(v as SupportedLanguage)} className="w-full">
                                 <TabsList className="bg-zinc-900 border-b border-zinc-800 rounded-none w-full justify-start h-auto p-0 flex-wrap">
-                                    <TabsTrigger value="javascript" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">JavaScript</TabsTrigger>
-                                    <TabsTrigger value="python" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">Python</TabsTrigger>
-                                    <TabsTrigger value="cpp" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">C++</TabsTrigger>
-                                    <TabsTrigger value="c" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">C</TabsTrigger>
-                                    <TabsTrigger value="java" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">Java</TabsTrigger>
+                                    <TabsTrigger value="javascript" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">JavaScript</TabsTrigger>
+                                    <TabsTrigger value="python" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">Python</TabsTrigger>
+                                    <TabsTrigger value="cpp" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">C++</TabsTrigger>
+                                    <TabsTrigger value="c" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">C</TabsTrigger>
+                                    <TabsTrigger value="java" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white text-zinc-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">Java</TabsTrigger>
                                 </TabsList>
 
                                 {(["javascript", "python", "cpp", "c", "java"] as SupportedLanguage[]).map((lang) => (
