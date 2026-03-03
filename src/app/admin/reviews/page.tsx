@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle2, XCircle, User, Clock, Code2 } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, User, Clock, Code2, Eye } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface PendingProblem {
     _id: string;
@@ -112,6 +113,16 @@ export default function AdminReviewsPage() {
                                     </div>
 
                                     <div className="flex gap-2 shrink-0">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            asChild
+                                            className="border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800"
+                                        >
+                                            <Link href={`/admin/reviews/${prob.problemId}`}>
+                                                <Eye className="w-4 h-4 mr-1" /> Review & Edit
+                                            </Link>
+                                        </Button>
                                         <Button
                                             size="sm"
                                             className="bg-green-600 hover:bg-green-500 text-white"
