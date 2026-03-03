@@ -1,0 +1,57 @@
+{
+    "courseId": "cpp",
+    "courseName": "C++ Object-Oriented Development",
+    "description": "Master C++ from standard syntax to advanced Object-Oriented Programming (OOP) and the Standard Template Library (STL).",
+    "topics": [
+        {
+            "topicId": "oop-basics",
+            "title": "Introduction to OOP",
+            "definition": "Object-Oriented Programming is a paradigm that organizes software design around data, or objects, rather than functions and logic. An object can be defined as a data field that has unique attributes and behavior.",
+            "explanation": "C++ extends the C language with OOP features. Instead of writing procedural code where functions modify global data, OOP encapsulates data and the functions that manipulate it into 'classes'.",
+            "pros": [
+                "Modularity: Objects are self-contained, making troubleshooting easier.",
+                "Code reuse through inheritance and composition.",
+                "Flexibility through polymorphism."
+            ],
+            "cons": [
+                "Steeper learning curve than procedural programming.",
+                "Can lead to bloated code if over-engineered.",
+                "Slightly heavier memory overhead due to vtables."
+            ],
+            "syntax": [
+                "class ClassName { public: data_type member; return_type method() { ... } };"
+            ],
+            "examples": [
+                {
+                    "title": "Basic Class Structure",
+                    "description": "Defining a class, creating an instance, and invoking a member function.",
+                    "code": "#include <iostream>\n#include <string>\n\nclass Car {\npublic:\n    std::string brand;\n    void honk() {\n        std::cout << \"Beep Beep!\\n\";\n    }\n};\n\nint main() {\n    Car myCar;\n    myCar.brand = \"Toyota\";\n    myCar.honk();\n    return 0;\n}"
+                }
+            ],
+            "bestPractices": [
+                "Keep class data members private and provide public getter/setter methods (Encapsulation).",
+                "Use constructors to initialize objects in a valid state.",
+                "Favor composition over inheritance when possible."
+            ],
+            "commonMistakes": [
+                "Forgetting the semicolon `;` at the end of a class definition.",
+                "Making all class variables public out of laziness.",
+                "Creating deep and overly complex inheritance hierarchies."
+            ],
+            "resources": [
+                {
+                    "type": "book",
+                    "title": "Effective C++",
+                    "author": "Scott Meyers",
+                    "url": "https://www.amazon.com/Effective-Specific-Improve-Programs-Designs/dp/0321334876"
+                },
+                {
+                    "type": "video",
+                    "title": "C++ Object Oriented Programming Tutorial",
+                    "author": "Programming with Mosh",
+                    "url": "https://www.youtube.com/watch?v=wN0x9eZLix4"
+                }
+            ]
+        }
+    ]
+}

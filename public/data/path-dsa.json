@@ -1,0 +1,62 @@
+{
+    "courseId": "dsa",
+    "courseName": "Data Structures & Algorithms",
+    "description": "The ultimate guide to DSA for technical interviews, spanning Arrays, Trees, Graphs, and Dynamic Programming.",
+    "topics": [
+        {
+            "topicId": "big-o",
+            "title": "Time & Space Complexity",
+            "definition": "Big O notation is a mathematical notation that describes the limiting behavior of a function when the argument tends towards a particular value or infinity. In programming, it classifies algorithms according to how their run time or space requirements grow as the input size grows.",
+            "explanation": "An algorithm that loops over an array once has O(n) time complexity. If you have a loop inside a loop, it becomes O(n²), which is much slower for large inputs.",
+            "pros": [
+                "Helps predict performance bottlenecks before writing code.",
+                "Provides a standardized vocabulary to discuss efficiency with other engineers."
+            ],
+            "cons": [
+                "Only describes the worst-case scenario; actual performance can vary.",
+                "Ignores constants (e.g., O(2n) is simply O(n)) which can matter in edge cases."
+            ],
+            "syntax": [
+                "O(1)",
+                "O(log n)",
+                "O(n)",
+                "O(n log n)",
+                "O(n^2)"
+            ],
+            "examples": [
+                {
+                    "title": "O(n) - Linear Time",
+                    "description": "The execution time grows linearly with the input size.",
+                    "code": "int linearSearch(int arr[], int n, int target) {\n    for (int i = 0; i < n; i++) {\n        if (arr[i] == target) return i;\n    }\n    return -1;\n}"
+                },
+                {
+                    "title": "O(n^2) - Quadratic Time",
+                    "description": "Execution time grows quadratically. Common in nested loops like bubble sort.",
+                    "code": "void printPairs(int arr[], int n) {\n    for (int i = 0; i < n; i++) {\n        for (int j = 0; j < n; j++) {\n            printf(\"(%d, %d)\\n\", arr[i], arr[j]);\n        }\n    }\n}"
+                }
+            ],
+            "bestPractices": [
+                "Always analyze the worst-case complexity of your algorithms.",
+                "Optimize loops and avoid nested iterations when possible by using HashMaps."
+            ],
+            "commonMistakes": [
+                "Ignoring space complexity when trying to optimize time.",
+                "Assuming built-in methods (like array sorting) are O(1); they often take O(n log n)."
+            ],
+            "resources": [
+                {
+                    "type": "book",
+                    "title": "Cracking the Coding Interview",
+                    "author": "Gayle Laakmann McDowell",
+                    "url": "https://www.crackingthecodinginterview.com/"
+                },
+                {
+                    "type": "video",
+                    "title": "Big O Notation - Full Course",
+                    "author": "freeCodeCamp",
+                    "url": "https://www.youtube.com/watch?v=Mo4vesaut8g"
+                }
+            ]
+        }
+    ]
+}

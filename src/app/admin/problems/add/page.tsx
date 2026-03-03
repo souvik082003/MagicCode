@@ -89,7 +89,7 @@ export default function AdminAddProblemPage() {
     const buildDescription = () => {
         let html = '';
         if (problemStatement.trim()) {
-            html += `<h3 style="margin-top:0">Problem Statement</h3>\n<p>${problemStatement.replace(/\n/g, '<br/>')}</p>\n`;
+            html += `<p style="margin-top:0">${problemStatement.replace(/\n/g, '<br/>')}</p>\n`;
         }
         if (imageUrl.trim()) {
             html += `<img src="${imageUrl}" alt="Problem illustration" style="max-width:100%; border-radius:8px; margin:16px 0;" />\n`;

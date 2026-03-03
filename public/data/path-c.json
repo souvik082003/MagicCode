@@ -1,0 +1,58 @@
+{
+    "courseId": "c",
+    "courseName": "C Programming Mastery",
+    "description": "A comprehensive guide to learning the C programming language from basics to system-level concepts.",
+    "topics": [
+        {
+            "topicId": "variables",
+            "title": "Variables & Data Types",
+            "definition": "Variables are named memory locations used to store data that can be changed during program execution. Each variable in C must be explicitly declared with a specific data type before it can be used.",
+            "explanation": "C is a statically typed language, meaning the compiler must know the type of every variable. This allows the compiler to allocate the exact amount of memory needed and perform type-checking to prevent errors.",
+            "pros": [
+                "Memory efficiency: You allocate exactly what you need.",
+                "Performance: Static typing allows for faster execution.",
+                "Direct hardware control: Essential for embedded systems."
+            ],
+            "cons": [
+                "Strict rules: Forgetting to declare a variable causes compilation errors.",
+                "Manual management: No automatic garbage collection.",
+                "Pointer complexity: Advanced types require understanding memory addresses."
+            ],
+            "syntax": [
+                "data_type variable_name;",
+                "data_type variable_name = initial_value;"
+            ],
+            "examples": [
+                {
+                    "title": "Basic Declarations",
+                    "description": "Declaring integers, floats, and characters.",
+                    "code": "#include <stdio.h>\n\nint main() {\n    int age = 22;\n    float height = 5.9;\n    char grade = 'A';\n    \n    printf(\"Age: %d, Height: %.1f, Grade: %c\\n\", age, height, grade);\n    return 0;\n}"
+                }
+            ],
+            "bestPractices": [
+                "Always initialize variables before using them to prevent garbage values.",
+                "Use meaningful, descriptive variable names (e.g., `total_score` instead of `ts`).",
+                "Use `const` for variables whose values should never change."
+            ],
+            "commonMistakes": [
+                "Using a variable before declaring it.",
+                "Assigning a float value to an int variable without realizing it truncates the decimal.",
+                "Forgetting the semicolon `;` at the end of the declaration."
+            ],
+            "resources": [
+                {
+                    "type": "book",
+                    "title": "The C Programming Language (2nd Edition)",
+                    "author": "Brian W. Kernighan & Dennis M. Ritchie",
+                    "url": "https://en.wikipedia.org/wiki/The_C_Programming_Language"
+                },
+                {
+                    "type": "article",
+                    "title": "GeeksforGeeks - Variables in C",
+                    "author": "GeeksforGeeks",
+                    "url": "https://www.geeksforgeeks.org/variables-in-c/"
+                }
+            ]
+        }
+    ]
+}
