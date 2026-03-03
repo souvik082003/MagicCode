@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash, ArrowLeft, Save } from "lucide-react";
+import { Plus, Trash, ArrowLeft, Save, ImagePlus, Upload, X, Clipboard } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -30,6 +30,86 @@ export default function AdminAddProblemPage() {
     const [testCases, setTestCases] = useState<TestCase[]>([{ input: "", expectedOutput: "" }]);
     const [problemId, setProblemId] = useState("");
     const [loadingId, setLoadingId] = useState(true);
+
+    // Structured description fields
+    const [problemStatement, setProblemStatement] = useState("");
+    const [examples, setExamples] = useState([{ input: "", output: "", explanation: "", image: "" }]);
+    const [constraints, setConstraints] = useState("");
+    const [imageUrl, setImageUrl] = useState("");
+
+    const processImageFile = (file: File, onDone: (dataUrl: string) => void) => {
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please upload an image file');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image must be under 5MB');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            onDone(reader.result as string);
+            toast.success('Image added!');
+        };
+        reader.onerror = () => toast.error('Failed to read image');
+        reader.readAsDataURL(file);
+    };
+
+    const handlePasteFor = (onDone: (dataUrl: string) => void) => (e: React.ClipboardEvent) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of Array.from(items)) {
+            if (item.type.startsWith('image/')) {
+                e.preventDefault();
+                const file = item.getAsFile();
+                if (file) processImageFile(file, onDone);
+                return;
+            }
+        }
+    };
+
+    const addExample = () => setExamples([...examples, { input: "", output: "", explanation: "", image: "" }]);
+    const removeExample = (idx: number) => {
+        if (examples.length > 1) setExamples(examples.filter((_, i) => i !== idx));
+    };
+    const updateExample = (idx: number, field: string, value: string) => {
+        const updated = [...examples];
+        updated[idx] = { ...updated[idx], [field]: value };
+        setExamples(updated);
+    };
+
+    // Build HTML description from structured fields
+    const buildDescription = () => {
+        let html = '';
+        if (problemStatement.trim()) {
+            html += `<h3 style="margin-top:0">Problem Statement</h3>\n<p>${problemStatement.replace(/\n/g, '<br/>')}</p>\n`;
+        }
+        if (imageUrl.trim()) {
+            html += `<img src="${imageUrl}" alt="Problem illustration" style="max-width:100%; border-radius:8px; margin:16px 0;" />\n`;
+        }
+        examples.forEach((ex, i) => {
+            if (ex.input.trim() || ex.output.trim() || ex.image) {
+                html += `<hr style="border:none;border-top:1px solid #333;margin:24px 0 16px" />\n`;
+                html += `<h4 style="margin-bottom:12px">Example ${i + 1}:</h4>\n`;
+                if (ex.image) {
+                    html += `<img src="${ex.image}" alt="Example ${i + 1} diagram" style="max-width:100%;border-radius:8px;margin:8px 0 12px" />\n`;
+                }
+                html += `<pre style="background:#1a1a2e;padding:12px;border-radius:8px;margin:8px 0"><code><strong>Input:</strong> ${ex.input}\n<strong>Output:</strong> ${ex.output}</code></pre>\n`;
+                if (ex.explanation.trim()) {
+                    html += `<p style="margin-top:8px;color:#aaa"><strong>Explanation:</strong> ${ex.explanation}</p>\n`;
+                }
+            }
+        });
+        if (constraints.trim()) {
+            html += `<hr style="border:none;border-top:1px solid #333;margin:24px 0 16px" />\n`;
+            html += `<h4 style="margin-bottom:8px">Constraints:</h4>\n<ul style="margin:0;padding-left:20px">\n`;
+            constraints.split('\n').filter(c => c.trim()).forEach(c => {
+                html += `  <li style="margin:4px 0">${c.trim()}</li>\n`;
+            });
+            html += `</ul>\n`;
+        }
+        return html;
+    };
 
     // Auto-generate next MC ID on mount
     useEffect(() => {
@@ -74,8 +154,13 @@ export default function AdminAddProblemPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!title.trim() || !description.trim()) {
-            toast.error("Please fill in all required fields (Title and Description).");
+        // Compose description from structured fields if present, otherwise use raw
+        const finalDescription = problemStatement.trim()
+            ? buildDescription()
+            : description;
+
+        if (!title.trim() || (!problemStatement.trim() && !description.trim())) {
+            toast.error("Please fill in all required fields (Title and Problem Statement/Description).");
             return;
         }
 
@@ -96,7 +181,7 @@ export default function AdminAddProblemPage() {
             difficulty,
             category,
             language,
-            description,
+            description: finalDescription,
             template,
             driverCode,
             companies: companyArray,
@@ -236,17 +321,208 @@ export default function AdminAddProblemPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="description" className="text-zinc-300">Description (HTML allowed) <span className="text-red-500">*</span></Label>
-                            <Textarea
-                                id="description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Write your problem description here. You can use basic HTML tags like <p>, <code>, <pre>..."
-                                className="min-h-[150px] font-mono text-sm bg-zinc-950 border-zinc-800"
-                                required
-                            />
-                        </div>
+                        {/* === STRUCTURED DESCRIPTION BUILDER === */}
+                        <Card className="bg-zinc-950/50 border-zinc-800 border-dashed">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base text-zinc-200">📝 Problem Description Builder</CardTitle>
+                                <CardDescription className="text-zinc-500 text-xs">Fill in the sections below. These will auto-compose into the final HTML description.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {/* Problem Statement */}
+                                <div className="space-y-2">
+                                    <Label className="text-zinc-300">Problem Statement <span className="text-red-500">*</span></Label>
+                                    <Textarea
+                                        value={problemStatement}
+                                        onChange={(e) => setProblemStatement(e.target.value)}
+                                        placeholder="Given an n × n 2D matrix, rotate the image by 90 degrees (clockwise). You have to rotate the image in-place."
+                                        className="min-h-[100px] bg-zinc-950 border-zinc-800 text-sm text-zinc-100"
+                                    />
+                                </div>
+
+                                {/* Image Upload */}
+                                <div className="space-y-2">
+                                    <Label className="text-zinc-300 flex items-center gap-2">
+                                        <ImagePlus className="w-4 h-4 text-blue-400" />
+                                        Image / Diagram <span className="text-zinc-500 text-xs ml-1">(Optional — upload, paste, or enter URL)</span>
+                                    </Label>
+
+                                    {!imageUrl ? (
+                                        <div
+                                            className="border-2 border-dashed border-zinc-700 rounded-xl p-4 text-center hover:border-blue-500/50 transition-colors cursor-pointer bg-zinc-950/50"
+                                            onPaste={handlePasteFor(setImageUrl)}
+                                            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-500'); }}
+                                            onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-500'); }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.currentTarget.classList.remove('border-blue-500');
+                                                const file = e.dataTransfer.files[0];
+                                                if (file) processImageFile(file, setImageUrl);
+                                            }}
+                                            onClick={() => document.getElementById('imageFileInput')?.click()}
+                                            tabIndex={0}
+                                        >
+                                            <input
+                                                id="imageFileInput"
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) processImageFile(file, setImageUrl);
+                                                }}
+                                            />
+                                            <div className="space-y-1">
+                                                <Upload className="w-6 h-6 mx-auto text-zinc-600" />
+                                                <p className="text-zinc-400 text-xs">Click, drag & drop, or <span className="text-blue-400">Ctrl+V</span> to paste</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="relative inline-block">
+                                            <img src={imageUrl} alt="Preview" className="max-h-48 rounded-lg border border-zinc-700" />
+                                            <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="icon"
+                                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                                                onClick={() => setImageUrl('')}
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {/* URL fallback */}
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <span className="text-xs text-zinc-600">Or enter URL:</span>
+                                        <Input
+                                            value={imageUrl.startsWith('data:') ? '' : imageUrl}
+                                            onChange={(e) => setImageUrl(e.target.value)}
+                                            placeholder="https://i.imgur.com/image.png"
+                                            className="bg-zinc-950 border-zinc-800 text-sm text-zinc-200 h-8 text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Examples */}
+                                <div className="space-y-3">
+                                    <Label className="text-zinc-300">Examples</Label>
+                                    {examples.map((ex, idx) => (
+                                        <div key={idx} className="p-4 rounded-lg border border-zinc-800 bg-zinc-900/50 space-y-3 relative group">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Example {idx + 1}</span>
+                                                {examples.length > 1 && (
+                                                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300" onClick={() => removeExample(idx)}>
+                                                        <Trash className="w-3 h-3" />
+                                                    </Button>
+                                                )}
+                                            </div>
+
+                                            {/* Per-example image upload */}
+                                            <div className="space-y-1">
+                                                <Label className="text-xs text-zinc-500 flex items-center gap-1">
+                                                    <ImagePlus className="w-3 h-3" /> Diagram / Screenshot (optional)
+                                                </Label>
+                                                {!ex.image ? (
+                                                    <div
+                                                        className="border border-dashed border-zinc-700 rounded-lg p-3 text-center hover:border-blue-500/50 transition-colors cursor-pointer bg-zinc-950/30"
+                                                        onPaste={handlePasteFor((url) => updateExample(idx, 'image', url))}
+                                                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-500'); }}
+                                                        onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-500'); }}
+                                                        onDrop={(e) => {
+                                                            e.preventDefault();
+                                                            e.currentTarget.classList.remove('border-blue-500');
+                                                            const file = e.dataTransfer.files[0];
+                                                            if (file) processImageFile(file, (url) => updateExample(idx, 'image', url));
+                                                        }}
+                                                        onClick={() => document.getElementById(`exImgInput${idx}`)?.click()}
+                                                        tabIndex={0}
+                                                    >
+                                                        <input
+                                                            id={`exImgInput${idx}`}
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) processImageFile(file, (url) => updateExample(idx, 'image', url));
+                                                            }}
+                                                        />
+                                                        <p className="text-zinc-500 text-xs">Click, drop, or Ctrl+V to add image</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="relative inline-block">
+                                                        <img src={ex.image} alt={`Example ${idx + 1}`} className="max-h-32 rounded border border-zinc-700" />
+                                                        <Button type="button" variant="destructive" size="icon" className="absolute -top-1 -right-1 h-5 w-5 rounded-full" onClick={() => updateExample(idx, 'image', '')}>
+                                                            <X className="w-2.5 h-2.5" />
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-zinc-500">Input</Label>
+                                                    <Input
+                                                        value={ex.input}
+                                                        onChange={(e) => updateExample(idx, "input", e.target.value)}
+                                                        placeholder="matrix = [[1,2,3],[4,5,6],[7,8,9]]"
+                                                        className="bg-zinc-950 border-zinc-800 font-mono text-xs text-zinc-200"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-zinc-500">Output</Label>
+                                                    <Input
+                                                        value={ex.output}
+                                                        onChange={(e) => updateExample(idx, "output", e.target.value)}
+                                                        placeholder="[[7,4,1],[8,5,2],[9,6,3]]"
+                                                        className="bg-zinc-950 border-zinc-800 font-mono text-xs text-zinc-200"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs text-zinc-500">Explanation (optional)</Label>
+                                                <Input
+                                                    value={ex.explanation}
+                                                    onChange={(e) => updateExample(idx, "explanation", e.target.value)}
+                                                    placeholder="The matrix is rotated 90 degrees clockwise."
+                                                    className="bg-zinc-950 border-zinc-800 text-xs text-zinc-200"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <Button type="button" variant="outline" size="sm" className="border-dashed border-zinc-700 text-zinc-400 hover:text-white text-xs" onClick={addExample}>
+                                        <Plus className="w-3 h-3 mr-1" /> Add Example
+                                    </Button>
+                                </div>
+
+                                {/* Constraints */}
+                                <div className="space-y-2">
+                                    <Label className="text-zinc-300">Constraints <span className="text-zinc-500 text-xs ml-1">(one per line)</span></Label>
+                                    <Textarea
+                                        value={constraints}
+                                        onChange={(e) => setConstraints(e.target.value)}
+                                        placeholder={"n == matrix.length == matrix[i].length\n1 <= n <= 20\n-1000 <= matrix[i][j] <= 1000"}
+                                        className="min-h-[80px] bg-zinc-950 border-zinc-800 font-mono text-xs text-zinc-200"
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Raw HTML fallback */}
+                        <details className="group">
+                            <summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-300 transition-colors">
+                                Advanced: Raw HTML Description (overrides builder if Problem Statement is empty)
+                            </summary>
+                            <div className="mt-2 space-y-2">
+                                <Textarea
+                                    id="description"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    placeholder="Write raw HTML here if you prefer..."
+                                    className="min-h-[150px] font-mono text-sm bg-zinc-950 border-zinc-800"
+                                />
+                            </div>
+                        </details>
 
                         <div className="space-y-2">
                             <Label htmlFor="template" className="text-zinc-300">Starter Code Template <span className="text-zinc-500 text-xs ml-2">(Optional)</span></Label>
