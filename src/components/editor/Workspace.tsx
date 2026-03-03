@@ -32,7 +32,13 @@ interface TestCaseResult {
 }
 
 export function Workspace({ problem }: WorkspaceProps) {
-    const [code, setCode] = useState(problem.template);
+    const initialCode = typeof problem.template === 'object' && problem.template !== null
+        ? (problem.template as any)[problem.language] || ""
+        : typeof problem.template === 'string'
+            ? problem.template
+            : "";
+
+    const [code, setCode] = useState<string>(initialCode);
     const [language, setLanguage] = useState<SupportedLanguage>(problem.language);
 
     // Submission history
@@ -46,9 +52,19 @@ export function Workspace({ problem }: WorkspaceProps) {
 
     const handleLanguageChange = (newLang: SupportedLanguage) => {
         setLanguage(newLang);
-        if (newLang === problem.language) {
+
+        // Load custom template if defined by admin for this specific language
+        const customTemplate = typeof problem.template === 'object' && problem.template !== null
+            ? (problem.template as any)[newLang]
+            : null;
+
+        if (customTemplate) {
+            setCode(customTemplate);
+        } else if (newLang === problem.language && typeof problem.template === 'string') {
+            // Fallback for older problems where template was just a string
             setCode(problem.template);
         } else {
+            // Default generic Codeforces-style boilerplates
             switch (newLang) {
                 case "c":
                     setCode('#include <stdio.h>\n\nint main() {\n    return 0;\n}');
@@ -63,7 +79,7 @@ export function Workspace({ problem }: WorkspaceProps) {
                     setCode('# Python 3 snippet\ndef main():\n    pass\n\nif __name__ == "__main__":\n    main()');
                     break;
                 case "java":
-                    setCode('public class Main {\n    public static void main(String[] args) {\n        // Write Java code here\n    }\n}');
+                    setCode('import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        // Write Java code here\n    }\n}');
                     break;
             }
         }
@@ -155,13 +171,24 @@ export function Workspace({ problem }: WorkspaceProps) {
         setTestResults(null);
 
         try {
+            // Extract driver code for the current language
+            let currentDriverCode = "";
+            if (problem.driverCode) {
+                if (typeof problem.driverCode === 'object' && problem.driverCode !== null) {
+                    currentDriverCode = (problem.driverCode as any)[language] || "";
+                } else if (typeof problem.driverCode === 'string' && problem.language === language) {
+                    // Fallback for older problems
+                    currentDriverCode = problem.driverCode;
+                }
+            }
+
             // Support both Leetcode and Codeforces styles
             let finalCode = code;
-            if (problem.driverCode) {
-                if (problem.driverCode.includes("{{USER_CODE}}")) {
-                    finalCode = problem.driverCode.replace("{{USER_CODE}}", code);
+            if (currentDriverCode) {
+                if (currentDriverCode.includes("{{USER_CODE}}")) {
+                    finalCode = currentDriverCode.replace("{{USER_CODE}}", code);
                 } else {
-                    finalCode = problem.driverCode + "\n" + code;
+                    finalCode = currentDriverCode + "\n" + code;
                 }
             }
 
@@ -448,7 +475,15 @@ export function Workspace({ problem }: WorkspaceProps) {
                                                 <SelectItem value="python">Python 3</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-zinc-100" onClick={() => setCode(problem.template)}>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-zinc-100" onClick={() => {
+                                            if (typeof problem.template === 'object' && problem.template !== null) {
+                                                setCode((problem.template as any)[language] || "");
+                                            } else if (typeof problem.template === 'string') {
+                                                setCode(problem.template);
+                                            } else {
+                                                setCode("");
+                                            }
+                                        }}>
                                             <RotateCcw className="w-3.5 h-3.5" />
                                         </Button>
                                     </div>

@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash, ArrowLeft, Save, ImagePlus, Upload, X, Clipboard } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Trash, ArrowLeft, Save, ImagePlus, Upload, X, Clipboard, Code2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -23,8 +24,12 @@ export default function AdminAddProblemPage() {
     const [category, setCategory] = useState("Custom");
     const [language, setLanguage] = useState<SupportedLanguage>("javascript");
     const [description, setDescription] = useState("");
-    const [template, setTemplate] = useState("");
-    const [driverCode, setDriverCode] = useState("");
+
+    // Per-language records for Templates and Driver Code
+    const [templates, setTemplates] = useState<Partial<Record<SupportedLanguage, string>>>({});
+    const [driverCodes, setDriverCodes] = useState<Partial<Record<SupportedLanguage, string>>>({});
+    const [activeLangTab, setActiveLangTab] = useState<SupportedLanguage>("javascript");
+
     const [companies, setCompanies] = useState("");
     const [topics, setTopics] = useState("");
     const [testCases, setTestCases] = useState<TestCase[]>([{ input: "", expectedOutput: "" }]);
@@ -190,8 +195,8 @@ export default function AdminAddProblemPage() {
             category,
             language,
             description: finalDescription,
-            template,
-            driverCode,
+            template: templates,
+            driverCode: driverCodes,
             companies: companyArray,
             topics: topicArray,
             authorName: session?.user?.name || "Admin",
@@ -554,29 +559,47 @@ export default function AdminAddProblemPage() {
                             </div>
                         </details>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="template" className="text-zinc-300">Starter Code Template <span className="text-zinc-500 text-xs ml-2">(Optional)</span></Label>
-                            <Textarea
-                                id="template"
-                                value={template}
-                                onChange={(e) => setTemplate(e.target.value)}
-                                placeholder="Provide the starting boilerplate code for the user..."
-                                className="min-h-[200px] font-mono text-sm bg-zinc-950 text-zinc-300 border-zinc-800 focus:border-zinc-700"
-                            />
-                        </div>
+                        <div className="pt-4 border-t border-zinc-800">
+                            <h3 className="text-lg font-semibold text-zinc-200 mb-4 flex items-center gap-2">
+                                <Code2 className="w-5 h-5 text-blue-400" /> Language Specific Code
+                            </h3>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="driverCode" className="text-zinc-300">Hidden Driver Code (Optional) </Label>
-                            <CardDescription className="mb-2 text-zinc-500">
-                                Use the <code className="bg-zinc-900 px-1 py-0.5 rounded text-white border border-zinc-800">{"{{USER_CODE}}"}</code> macro to inject the user's submitted solution block into a hidden <code className="bg-zinc-900 px-1 py-0.5 rounded text-white border border-zinc-800">main()</code> function. Leave blank for Codeforces-style raw execution.
-                            </CardDescription>
-                            <Textarea
-                                id="driverCode"
-                                value={driverCode}
-                                onChange={(e) => setDriverCode(e.target.value)}
-                                placeholder={`#include <iostream>\n#include <vector>\nusing namespace std;\n\n{{USER_CODE}}\n\nint main() {\n    // Hidden testing logic here \n}`}
-                                className="min-h-[200px] font-mono text-sm bg-zinc-950/50 border-dashed text-zinc-400 border-zinc-800 focus:border-zinc-700"
-                            />
+                            <Tabs value={activeLangTab} onValueChange={(v) => setActiveLangTab(v as SupportedLanguage)} className="w-full">
+                                <TabsList className="bg-zinc-900 border-b border-zinc-800 rounded-none w-full justify-start h-auto p-0 flex-wrap">
+                                    <TabsTrigger value="javascript" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">JavaScript</TabsTrigger>
+                                    <TabsTrigger value="python" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">Python</TabsTrigger>
+                                    <TabsTrigger value="cpp" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">C++</TabsTrigger>
+                                    <TabsTrigger value="c" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">C</TabsTrigger>
+                                    <TabsTrigger value="java" className="data-[state=active]:bg-zinc-800 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 rounded-none px-4 py-2">Java</TabsTrigger>
+                                </TabsList>
+
+                                {(["javascript", "python", "cpp", "c", "java"] as SupportedLanguage[]).map((lang) => (
+                                    <TabsContent key={lang} value={lang} className="p-4 space-y-6 bg-zinc-950/30 border border-t-0 border-zinc-800 rounded-b-lg m-0">
+                                        <div className="space-y-2">
+                                            <Label className="text-zinc-300">Starter Code Template <span className="text-zinc-500 text-xs ml-2">(Optional Codeforces Boilerplate or Leetcode Function signature)</span></Label>
+                                            <Textarea
+                                                value={templates[lang] || ""}
+                                                onChange={(e) => setTemplates(prev => ({ ...prev, [lang]: e.target.value }))}
+                                                placeholder={`Provide the starting boilerplate code for ${lang}...`}
+                                                className="min-h-[150px] font-mono text-sm bg-zinc-950 text-zinc-300 border-zinc-800 focus:border-zinc-700"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-zinc-300">Hidden Driver Code (Optional) </Label>
+                                            <CardDescription className="mb-2 text-zinc-500">
+                                                Use the <code className="bg-zinc-900 px-1 py-0.5 rounded text-white border border-zinc-800">{"{{USER_CODE}}"}</code> macro to wrap their function. Leave blank for raw Codeforces execution.
+                                            </CardDescription>
+                                            <Textarea
+                                                value={driverCodes[lang] || ""}
+                                                onChange={(e) => setDriverCodes(prev => ({ ...prev, [lang]: e.target.value }))}
+                                                placeholder={`Example wrapper for ${lang}...`}
+                                                className="min-h-[150px] font-mono text-sm bg-zinc-950/50 border-dashed text-zinc-400 border-zinc-800 focus:border-zinc-700"
+                                            />
+                                        </div>
+                                    </TabsContent>
+                                ))}
+                            </Tabs>
                         </div>
                     </CardContent>
                 </Card>

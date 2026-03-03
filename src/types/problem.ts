@@ -13,8 +13,8 @@ export interface ProblemDefinition {
     category: string;
     language: SupportedLanguage;
     description: React.ReactNode | string;
-    template: string;
-    driverCode?: string;
+    template: string | Partial<Record<SupportedLanguage, string>>;
+    driverCode?: string | Partial<Record<SupportedLanguage, string>>;
     authorName?: string;
     solvers?: string[];
     companies?: string[];
