@@ -94,8 +94,8 @@ export default function LearningPathsLanding() {
                     <div className="group relative animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-300 h-full">
                         <div className="absolute -inset-0.5 bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl blur opacity-15 transition duration-500"></div>
                         <Card className="relative h-full bg-zinc-950/80 border-dashed border-2 border-zinc-800 backdrop-blur-xl rounded-3xl overflow-hidden flex flex-col transition-all duration-300 opacity-90 grayscale-[50%]">
-                            <div className="absolute top-4 right-4 bg-zinc-900 border border-zinc-800 rounded-full p-2 z-20">
-                                <Lock className="w-4 h-4 text-zinc-500" />
+                            <div className="absolute top-4 right-4 bg-zinc-900 border border-emerald-500/30 rounded-full p-2 z-20">
+                                <BrainCircuit className="w-4 h-4 text-emerald-400" />
                             </div>
                             <div className="h-48 w-full bg-gradient-to-br from-green-900/20 to-slate-900 flex items-center justify-center relative overflow-hidden">
                                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/circuit-board.png')] opacity-10 mask-image:linear-gradient(to_bottom,white,transparent)"></div>
@@ -113,8 +113,10 @@ export default function LearningPathsLanding() {
                                 </div>
                             </CardContent>
                             <CardFooter className="pt-4 pb-8 flex justify-center">
-                                <Button disabled size="lg" variant="outline" className="rounded-full bg-zinc-900/50 border-zinc-800 text-zinc-500 font-bold px-8">
-                                    Complete World 2 First
+                                <Button asChild size="lg" className="rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-8 shadow-[0_0_20px_rgba(16,185,129,0.4)] group-hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] transition-all">
+                                    <Link href="/learning-paths/dsa">
+                                        Enter World <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                                    </Link>
                                 </Button>
                             </CardFooter>
                         </Card>
