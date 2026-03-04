@@ -1,9 +1,5 @@
 # Contributing to MagicCode
 
-First off, thank you for considering contributing to MagicCode! It's people like you that make the open-source community such a fantastic place to learn, inspire, and create.
-
-While bug fixes and UI enhancements are always welcome, the primary way we encourage community contributions is by **expanding our Gamified Learning Paths**.
-
 ---
 
 ## 🗺️ Adding to the Learning Paths
