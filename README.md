@@ -86,7 +86,7 @@ We highly encourage developers to contribute to our JSON-based curriculum paths.
 
 ## 👨‍💻 Innovation & Creation
 
-MagicCode is the brainchild and solo innovation of **Souvik Samanta**. Driven by a deep passion for system architecture, algorithmic design, and educational technology, engineered this full-stack platform from the ground up to revolutioniz
+MagicCode is the brainchild and solo innovation of **Souvik Samanta**. Driven by a deep passion for system architecture, algorithmic design, and educational technology, engineered this full-stack platform from the ground up to r
 
 <div align="center">
   <sub>Built with ❤️ by Souvik Samanta</sub>
