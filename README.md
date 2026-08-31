@@ -74,7 +74,6 @@ When a user clicks "Submit Code" inside the workspace:
 Once the Next.js API confidently determines the parsed test cases have passed successfully:
 1. **Transaction Triggered:** A Mongoose session updates the `Submission` ledger to track the user's solution time and language.
 2. **XP Calculation:** The algorithm checks the difficulty rating (`Easy = 10xp`, `Medium = 20xp`, `Hard = 30xp`) and increments the target profile in MongoDB simultaneously.
-3. **Leaderboard Swap:** Changes instantly propagate through the platform, meaning Leaderboard ranks mathematically shift in real-time.
 
 ---
 
